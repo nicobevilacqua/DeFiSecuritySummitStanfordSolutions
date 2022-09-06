@@ -7,10 +7,10 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {VToken} from "../src/Challenge0.VToken.sol";
 
 contract Challenge0Test is Test {
-    address token;
+    address private token;
 
-    address player = makeAddr("player");
-    address vitalik = 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045;
+    address private player = makeAddr("player");
+    address private vitalik = 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045;
 
     function setUp() public {
         token = address(new VToken());
