@@ -54,8 +54,6 @@ contract FlashLoandReceiverSample {
         token.transfer(_user, balanceBefore);
 
         token = new FakeInSecureumToken(balanceBefore);
-
-        uint256 balanceAfter = token.balanceOf(address(this));
     }
 }
 
